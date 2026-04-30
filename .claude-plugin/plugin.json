@@ -1,0 +1,8 @@
+{
+  "name": "codex-adapter",
+  "version": "0.1.0",
+  "description": "Semantic Claude Code adapter for local Codex delegation, review, search, and comparison.",
+  "author": {
+    "name": "toolboxmd"
+  }
+}

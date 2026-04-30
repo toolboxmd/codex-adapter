@@ -1,0 +1,34 @@
+{
+  "name": "@toolboxmd/codex-adapter",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Local Claude Code plugin that exposes Codex through semantic agent intents.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toolboxmd/codex-adapter.git"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "bin": {
+    "codex-adapter": "./scripts/codexctl.mjs"
+  },
+  "files": [
+    ".claude-plugin/",
+    "agents/",
+    "commands/",
+    "schemas/",
+    "scripts/",
+    "skills/",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "validate": "node scripts/validate-plugin.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "smoke:diagnostics": "node scripts/codexctl.mjs diagnostics --json",
+    "smoke:context": "node scripts/codexctl.mjs context-preview --json --intent review --mode code"
+  }
+}

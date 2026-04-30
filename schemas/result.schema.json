@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Adapter Result",
+  "type": "object",
+  "required": ["jobId", "intent", "status", "summary"],
+  "properties": {
+    "jobId": { "type": "string" },
+    "intent": { "type": "string" },
+    "mode": { "type": "string" },
+    "status": { "type": "string" },
+    "summary": { "type": "string" },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Adapter Job",
+  "type": "object",
+  "required": ["id", "intent", "status", "phase", "workspaceRoot", "createdAt", "updatedAt"],
+  "properties": {
+    "id": { "type": "string" },
+    "intent": { "type": "string" },
+    "mode": { "type": "string" },
+    "status": { "type": "string", "enum": ["queued", "running", "pending_approval", "completed", "failed", "cancelled"] },
+    "phase": { "type": "string" },
+    "workspaceRoot": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" }
+  }
+}

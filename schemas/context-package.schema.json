@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Adapter Context Package",
+  "type": "object",
+  "required": ["schemaVersion", "type", "intent", "mode", "packageClass", "workspaceRoot", "redaction", "egress", "outputContract"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "type": { "type": "string", "const": "context-package" },
+    "intent": { "type": "string", "enum": ["execute", "review", "rescue", "search", "compare"] },
+    "mode": { "type": "string" },
+    "packageClass": { "type": "string", "enum": ["task-package", "review-package", "rescue-package", "search-package"] },
+    "workspaceRoot": { "type": "string" },
+    "redaction": { "type": "object" },
+    "egress": { "type": "object" },
+    "outputContract": { "type": "string" }
+  }
+}
