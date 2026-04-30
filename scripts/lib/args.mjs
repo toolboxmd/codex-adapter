@@ -1,7 +1,7 @@
 export function parseArgs(argv) {
   const flags = {};
   const positional = [];
-  const booleanFlags = new Set(["json", "background", "wait", "all", "help"]);
+  const booleanFlags = new Set(["json", "background", "resume-last", "wait", "all", "help"]);
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];

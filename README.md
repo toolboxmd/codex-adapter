@@ -36,11 +36,15 @@ If more than one `codex` binary exists on `PATH`, diagnostics selects the newest
 
 ```bash
 node scripts/codexctl.mjs execute --mode exec "Return exactly: ok"
+node scripts/codexctl.mjs execute --mode exec --prompt-file prompt.md
+node scripts/codexctl.mjs rescue --mode fix --profile rescue-workspace --resume-last "Fix the failing verification"
 node scripts/codexctl.mjs execute --mode structured --schema schemas/structured-output.example.schema.json "Return status ok"
 node scripts/codexctl.mjs review --mode plan "Review this plan"
 node scripts/codexctl.mjs search --mode sources "Find current sources for ..."
 node scripts/codexctl.mjs compare --mode parallel-review --count 2 "Compare this diff"
 ```
+
+`--prompt-file <file>` is read by the adapter and streamed to Codex over stdin, so long structured prompts do not have to fit in shell argv. Inline task text after the file is appended after the file content. `--resume <session-id>` and `--resume-last` are supported for `execute` and `rescue` through `codex exec resume`; compare and search remain fresh-session intents.
 
 Longer jobs can be started with `--background`, then inspected with `status` and `result`:
 

@@ -24,8 +24,10 @@ Use this skill to choose a semantic Codex Adapter intent. Claude should not reas
 1. Run `/codex-adapter:diagnostics` first if Codex availability, auth, search, or sandbox state is uncertain.
 2. Run `/codex-adapter:context-preview` before sending broad, sensitive, or ambiguous context.
 3. Prefer semantic commands over internal Codex concepts: `review mode=plan`, not "thread start with plan prompt".
-4. Never approve write, network, MCP, or sandbox escalation unless the active profile explicitly allows it.
-5. After write-capable rescue, inspect the diff and run verification before accepting the result.
+4. Use `--prompt-file <file>` for large structured prompts, contracts, rubrics, or asset-list schemas.
+5. Use `--resume <session-id>` or `--resume-last` only for `execute` and `rescue` when intentionally continuing a previous Codex exec session.
+6. Never approve write, network, MCP, or sandbox escalation unless the active profile explicitly allows it.
+7. After write-capable rescue, inspect the diff and run verification before accepting the result.
 
 ## Result Handling
 

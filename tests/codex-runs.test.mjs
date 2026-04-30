@@ -24,6 +24,67 @@ describe("codex intent runner", () => {
     assert.ok(fs.existsSync(result.artifacts.result));
   });
 
+  it("streams prompt-file content through stdin and records prompt metadata", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-adapter-prompt-file-"));
+    const fake = makeEchoCodex(dir);
+    const promptFile = path.join(dir, "prompt.md");
+    fs.writeFileSync(promptFile, "minigame asset contract\n");
+
+    const result = runIntent("execute", {
+      cwd: dir,
+      env: { ...process.env, CODEX_ADAPTER_CODEX_BIN: fake, CODEX_ADAPTER_STATE_DIR: path.join(dir, "state") },
+      flags: { mode: "exec", "prompt-file": "prompt.md" },
+      positional: ["tail instruction"]
+    });
+
+    assert.equal(result.status, "completed");
+    assert.match(result.output, /minigame asset contract/);
+    assert.match(result.output, /tail instruction/);
+    const context = JSON.parse(fs.readFileSync(result.artifacts.contextPackage, "utf8"));
+    assert.equal(context.input.source, "prompt-file+positional");
+    assert.equal(context.input.promptFile.path, "prompt.md");
+    const args = JSON.parse(fs.readFileSync(path.join(dir, "args.json"), "utf8"));
+    assert.equal(args.at(-1), "-");
+    assert.ok(!args.some((arg) => arg.includes("minigame asset contract")));
+  });
+
+  it("routes resume-last through codex exec resume with adapter sandbox config", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-adapter-resume-"));
+    const fake = makeEchoCodex(dir);
+
+    const result = runIntent("rescue", {
+      cwd: dir,
+      env: { ...process.env, CODEX_ADAPTER_CODEX_BIN: fake, CODEX_ADAPTER_STATE_DIR: path.join(dir, "state") },
+      flags: { mode: "fix", profile: "rescue-workspace", "resume-last": true },
+      positional: ["fix the failing test"]
+    });
+
+    assert.equal(result.status, "completed");
+    assert.match(result.output, /Perform a scoped rescue task in fix mode/);
+    const args = JSON.parse(fs.readFileSync(path.join(dir, "args.json"), "utf8"));
+    assert.deepEqual(args.slice(0, 2), ["exec", "resume"]);
+    assert.ok(args.includes("--last"));
+    assert.ok(args.includes('sandbox_mode="workspace-write"'));
+    assert.ok(args.includes('approval_policy="never"'));
+    assert.equal(args.at(-1), "-");
+  });
+
+  it("rejects resume for compare jobs", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-adapter-resume-reject-"));
+    const fake = makeEchoCodex(dir);
+
+    assert.throws(
+      () =>
+        runIntent("compare", {
+          cwd: dir,
+          env: { ...process.env, CODEX_ADAPTER_CODEX_BIN: fake, CODEX_ADAPTER_STATE_DIR: path.join(dir, "state") },
+          flags: { mode: "parallel-review", "resume-last": true },
+          positional: ["compare this"]
+        }),
+      /supported only for execute and rescue/
+    );
+  });
+
   it("rejects post-MVP danger profile", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "codex-adapter-run-"));
     const fake = makeFakeCodex(dir);
@@ -158,6 +219,33 @@ function makeFakeCodex(dir) {
       "const outIndex = args.indexOf('-o');",
       "if (outIndex !== -1) fs.writeFileSync(args[outIndex + 1], 'fake final answer\\n');",
       "console.log('fake stdout');"
+    ].join("\n")
+  );
+  fs.chmodSync(fake, 0o755);
+  return fake;
+}
+
+function makeEchoCodex(dir) {
+  const fake = path.join(dir, "codex-echo.mjs");
+  const argsPath = path.join(dir, "args.json");
+  fs.writeFileSync(
+    fake,
+    [
+      "#!/usr/bin/env node",
+      "import fs from 'node:fs';",
+      "const args = process.argv.slice(2);",
+      "if (args[0] === '--version') { console.log('codex-cli 0.125.0'); process.exit(0); }",
+      "if (args[0] === 'login' && args[1] === 'status') { console.log('Logged in'); process.exit(0); }",
+      "if (args[0] === 'app-server' && args[1] === '--help') { console.log('app-server help'); process.exit(0); }",
+      "if (args[0] === '--help') { console.log('Usage: codex --search'); process.exit(0); }",
+      "if (args[0] === 'exec' && args[1] === '--help') { console.log('Commands:\\n  resume  Resume a previous session by id or pick the most recent with --last\\n\\nArguments:\\n  [PROMPT]\\n          instructions are read from stdin'); process.exit(0); }",
+      "if (args[0] === 'exec' && args[1] === 'resume' && args[2] === '--help') { console.log('Resume a previous session by id or pick the most recent with --last'); process.exit(0); }",
+      "if (args[0] === 'review' && args[1] === '--help') { console.log('Custom review instructions. If `-` is used, read from stdin'); process.exit(0); }",
+      `fs.writeFileSync(${JSON.stringify(argsPath)}, JSON.stringify(args));`,
+      "const stdin = fs.readFileSync(0, 'utf8');",
+      "const outIndex = args.indexOf('-o');",
+      "if (outIndex !== -1) fs.writeFileSync(args[outIndex + 1], stdin);",
+      "console.log('echo stdout');"
     ].join("\n")
   );
   fs.chmodSync(fake, 0o755);

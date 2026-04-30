@@ -19,4 +19,12 @@ describe("plugin layout", () => {
       assert.equal(fs.existsSync(path.join(ROOT, "commands", `${command}.md`)), false, command);
     }
   });
+
+  it("wires the delegate agent to the adapter runtime", () => {
+    const agent = fs.readFileSync(path.join(ROOT, "agents", "codex-delegate.md"), "utf8");
+    assert.match(agent, /model: sonnet/);
+    assert.match(agent, /tools: Bash/);
+    assert.match(agent, /codexctl\.mjs/);
+    assert.match(agent, /--prompt-file/);
+  });
 });

@@ -5,6 +5,7 @@ import { buildContextPackage } from "./context-package.mjs";
 import { collectDiagnostics } from "./diagnostics.mjs";
 import { createJob, jobArtifactDir, writeJob } from "./jobs.mjs";
 import { normalizeIntent } from "./intent-router.mjs";
+import { resolveTaskInput, taskInputContext } from "./prompt-input.mjs";
 import { validateJsonOutput } from "./schema-validation.mjs";
 
 export function runIntent(command, options = {}) {
@@ -13,7 +14,9 @@ export function runIntent(command, options = {}) {
   const positional = options.positional ?? [];
   const mode = flags.mode;
   const { intent, mode: normalizedMode } = normalizeIntent(command, mode);
-  const userRequest = positional.join(" ").trim();
+  const taskInput = resolveTaskInput({ cwd, flags, positional });
+  const userRequest = taskInput.text;
+  const resume = resumeRequest(flags);
   const diagnostics = collectDiagnostics({ cwd, env: options.env ?? process.env });
   if (!diagnostics.codex.available) {
     throw new Error("Codex binary is unavailable. Run setup for recovery instructions.");
@@ -30,9 +33,14 @@ export function runIntent(command, options = {}) {
     mode: normalizedMode,
     userRequest,
     diagnostics,
-    profile: flags.profile
+    profile: flags.profile,
+    input: taskInputContext(taskInput)
   });
   validateProfile({ intent, mode: normalizedMode, profile: contextPackage.profile });
+  validateResume({ intent, resume });
+  if (resume && !diagnostics.codex.features?.execResume) {
+    throw new Error("Installed Codex does not advertise `codex exec resume`; upgrade Codex or omit --resume/--resume-last.");
+  }
   const job = createJob(
     {
       id: flags["job-id"],
@@ -44,6 +52,8 @@ export function runIntent(command, options = {}) {
       profile: contextPackage.profile,
       model: flags.model ?? null,
       effort: flags.effort ?? null,
+      resume,
+      promptFile: taskInput.promptFile?.path ?? null,
       sandbox: sandboxFor(contextPackage.profile),
       approvalPolicy: "never"
     },
@@ -65,6 +75,7 @@ export function runIntent(command, options = {}) {
     userRequest,
     contextPackage,
     flags,
+    resume,
     lastMessagePath
   });
 
@@ -75,7 +86,7 @@ export function runIntent(command, options = {}) {
   }
 
   const output = safeRead(lastMessagePath) || codexRun.stdout || codexRun.stderr || codexRun.error || "";
-  const structuredValidation = mode === "structured" ? validateJsonOutput(output, flags.schema) : null;
+  const structuredValidation = normalizedMode === "structured" ? validateJsonOutput(output, flags.schema) : null;
   const completed = codexRun.status === 0 && !codexRun.error && (!structuredValidation || structuredValidation.valid);
   const result = {
     type: "intent-result",
@@ -115,7 +126,11 @@ export function runIntent(command, options = {}) {
   return result;
 }
 
-function runCodexCli({ codexPath, cwd, intent, mode, userRequest, contextPackage, flags, lastMessagePath }) {
+function runCodexCli({ codexPath, cwd, intent, mode, userRequest, contextPackage, flags, resume, lastMessagePath }) {
+  if (resume) {
+    return runCodexResume({ codexPath, cwd, intent, mode, userRequest, contextPackage, flags, resume, lastMessagePath });
+  }
+
   if (intent === "review" && mode === "code") {
     const args = ["review"];
     if (flags.base) {
@@ -126,8 +141,7 @@ function runCodexCli({ codexPath, cwd, intent, mode, userRequest, contextPackage
       args.push("--uncommitted");
     }
     const prompt = userRequest || "Review the current local changes. Return findings first.";
-    args.push(prompt);
-    return run(codexPath, args, { cwd, timeoutMs: timeoutMs(flags) });
+    return runWithPrompt(codexPath, args, prompt, { cwd, timeoutMs: timeoutMs(flags) });
   }
 
   if (intent === "compare") {
@@ -147,8 +161,20 @@ function runCodexCli({ codexPath, cwd, intent, mode, userRequest, contextPackage
     }
     args.push("--output-schema", flags.schema);
   }
-  args.push(promptFor(intent, mode, userRequest, contextPackage));
-  return run(codexPath, args, { cwd, timeoutMs: timeoutMs(flags) });
+  return runWithPrompt(codexPath, args, promptFor(intent, mode, userRequest, contextPackage), { cwd, timeoutMs: timeoutMs(flags) });
+}
+
+function runCodexResume({ codexPath, cwd, intent, mode, userRequest, contextPackage, flags, resume, lastMessagePath }) {
+  const args = ["exec", "resume", "--skip-git-repo-check", "-o", lastMessagePath];
+  addConfigOverride(args, "sandbox_mode", sandboxFor(contextPackage.profile));
+  addConfigOverride(args, "approval_policy", "never");
+  if (flags.model) args.push("--model", flags.model);
+  if (resume.last) {
+    args.push("--last");
+  } else {
+    args.push(resume.sessionId);
+  }
+  return runWithPrompt(codexPath, args, promptFor(intent, mode, userRequest, contextPackage), { cwd, timeoutMs: timeoutMs(flags) });
 }
 
 function runCompare({ codexPath, cwd, userRequest, flags, lastMessagePath }) {
@@ -164,9 +190,10 @@ function runCompare({ codexPath, cwd, userRequest, flags, lastMessagePath }) {
       userRequest || "Review the current local changes.",
       "Return findings first with severity and file references where possible."
     ].join("\n\n");
-    const result = run(
+    const result = runWithPrompt(
       codexPath,
-      ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-C", cwd, prompt],
+      ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-C", cwd],
+      prompt,
       { cwd, timeoutMs: remaining }
     );
     outputs.push(`## Reviewer ${index + 1}\n\n${result.stdout || result.stderr || result.error || ""}`);
@@ -185,9 +212,10 @@ function runCompare({ codexPath, cwd, userRequest, flags, lastMessagePath }) {
     "",
     outputs.join("\n\n")
   ].join("\n");
-  const synthesis = run(
+  const synthesis = runWithPrompt(
     codexPath,
-    ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-C", cwd, "-o", lastMessagePath, synthesisPrompt],
+    ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-C", cwd, "-o", lastMessagePath],
+    synthesisPrompt,
     { cwd, timeoutMs: Math.max(1, remainingTimeout(deadline)) }
   );
   if (synthesis.status !== 0) {
@@ -255,6 +283,14 @@ function sandboxFor(profile) {
   return "read-only";
 }
 
+function runWithPrompt(command, args, prompt, options) {
+  return run(command, [...args, "-"], { ...options, input: prompt });
+}
+
+function addConfigOverride(args, key, value) {
+  args.push("-c", `${key}=${JSON.stringify(value)}`);
+}
+
 function validateProfile({ intent, mode, profile }) {
   if (profile === "danger-unrestricted") {
     throw new Error("danger-unrestricted is post-MVP and cannot be used by codex-adapter intents.");
@@ -267,6 +303,29 @@ function validateProfile({ intent, mode, profile }) {
   }
   if (intent === "search" && profile !== "search-readonly") {
     throw new Error("search requires search-readonly in MVP.");
+  }
+}
+
+function resumeRequest(flags) {
+  if (flags.resume && flags["resume-last"]) {
+    throw new Error("Use either --resume <session-id> or --resume-last, not both.");
+  }
+  if (flags["resume-last"]) {
+    return { mode: "last", last: true, sessionId: null };
+  }
+  if (flags.resume) {
+    if (flags.resume === true) {
+      throw new Error("--resume requires a session id.");
+    }
+    return { mode: "session", last: false, sessionId: String(flags.resume) };
+  }
+  return null;
+}
+
+function validateResume({ intent, resume }) {
+  if (!resume) return;
+  if (!["execute", "rescue"].includes(intent)) {
+    throw new Error("--resume and --resume-last are supported only for execute and rescue intents.");
   }
 }
 

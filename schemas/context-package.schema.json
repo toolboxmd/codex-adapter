@@ -10,6 +10,7 @@
     "mode": { "type": "string" },
     "packageClass": { "type": "string", "enum": ["task-package", "review-package", "rescue-package", "search-package"] },
     "workspaceRoot": { "type": "string" },
+    "input": { "type": ["object", "null"] },
     "redaction": { "type": "object" },
     "egress": { "type": "object" },
     "outputContract": { "type": "string" }

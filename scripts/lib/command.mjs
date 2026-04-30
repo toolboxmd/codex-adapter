@@ -5,6 +5,7 @@ export function run(command, args = [], options = {}) {
     cwd: options.cwd,
     env: options.env,
     encoding: "utf8",
+    input: options.input,
     timeout: options.timeoutMs ?? 10000,
     maxBuffer: options.maxBuffer ?? 1024 * 1024 * 8
   });

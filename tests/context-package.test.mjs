@@ -14,6 +14,7 @@ describe("context package", () => {
     fs.writeFileSync(path.join(dir, "app.js"), "console.log('ok');\n");
     run("git", ["add", "app.js"], { cwd: dir });
     run("git", ["commit", "-m", "init"], { cwd: dir, env: { ...process.env, GIT_AUTHOR_NAME: "A", GIT_AUTHOR_EMAIL: "a@example.com", GIT_COMMITTER_NAME: "A", GIT_COMMITTER_EMAIL: "a@example.com" } });
+    fs.writeFileSync(path.join(dir, "app.js"), "console.log('changed');\n");
 
     const pkg = buildContextPackage({
       cwd: dir,
@@ -27,6 +28,8 @@ describe("context package", () => {
 
     assert.equal(pkg.packageClass, "search-package");
     assert.equal(pkg.profile, "search-readonly");
+    assert.ok(pkg.files.candidates.some((entry) => entry.path === "app.js"));
+    assert.ok(!pkg.files.candidates.some((entry) => entry.path === "pp.js"));
     assert.ok(pkg.redaction.omitted.some((entry) => entry.path === ".env"));
   });
 });

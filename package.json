@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Local Claude Code plugin that exposes Codex through semantic agent intents.",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/toolboxmd/codex-adapter.git"

@@ -39,6 +39,7 @@ export function collectDiagnostics(options = {}) {
     path: codexPath,
     version: null,
     rawVersion: null,
+    features: {},
     candidates: selectedCodex.candidates
   };
   const warnings = [];
@@ -67,6 +68,14 @@ export function collectDiagnostics(options = {}) {
   const auth = getAuthStatus(codexPath, cwd, env);
   const appServer = getAppServerStatus(codexPath, cwd, env);
   const help = getHelp(codexPath, cwd, env);
+  const execHelp = getHelp(codexPath, cwd, env, ["exec", "--help"]);
+  const execResumeHelp = getHelp(codexPath, cwd, env, ["exec", "resume", "--help"]);
+  const reviewHelp = getHelp(codexPath, cwd, env, ["review", "--help"]);
+  codex.features = {
+    execStdinPrompt: /read from stdin|instructions are read from stdin/i.test(execHelp),
+    execResume: /resume\s+Resume a previous session|Resume a previous session/i.test(`${execHelp}\n${execResumeHelp}`),
+    reviewStdinPrompt: /read from stdin/i.test(reviewHelp)
+  };
   const git = getGitStatus(cwd, env);
   const gates = {
     search: searchGate({ codex, auth, help })
@@ -135,11 +144,11 @@ function getAppServerStatus(codexPath, cwd, env) {
   };
 }
 
-function getHelp(codexPath, cwd, env) {
+function getHelp(codexPath, cwd, env, args = ["--help"]) {
   if (!codexPath) {
     return "";
   }
-  const result = run(codexPath, ["--help"], { cwd, env, timeoutMs: 10000 });
+  const result = run(codexPath, args, { cwd, env, timeoutMs: 10000 });
   return clean(`${result.stdout}\n${result.stderr}`);
 }
 
@@ -150,8 +159,12 @@ function getGitStatus(cwd, env) {
   return {
     isRepo: isRepo.status === 0 && isRepo.stdout.trim() === "true",
     root: root.status === 0 ? root.stdout.trim() : null,
-    statusShort: status.status === 0 ? status.stdout.trim().split("\n").filter(Boolean) : []
+    statusShort: status.status === 0 ? statusLines(status.stdout) : []
   };
+}
+
+function statusLines(stdout) {
+  return String(stdout ?? "").trimEnd().split("\n").filter(Boolean);
 }
 
 function searchGate({ codex, auth, help }) {

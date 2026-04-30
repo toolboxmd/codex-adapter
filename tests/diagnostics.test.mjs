@@ -17,6 +17,9 @@ describe("diagnostics", () => {
         "if [ \"$1\" = \"login\" ] && [ \"$2\" = \"status\" ]; then echo 'Logged in'; exit 0; fi",
         "if [ \"$1\" = \"app-server\" ] && [ \"$2\" = \"--help\" ]; then echo 'app-server help'; exit 0; fi",
         "if [ \"$1\" = \"--help\" ]; then echo 'Usage: codex --search'; exit 0; fi",
+        "if [ \"$1\" = \"exec\" ] && [ \"$2\" = \"--help\" ]; then echo 'resume  Resume a previous session'; echo 'instructions are read from stdin'; exit 0; fi",
+        "if [ \"$1\" = \"exec\" ] && [ \"$2\" = \"resume\" ] && [ \"$3\" = \"--help\" ]; then echo 'Resume a previous session by id'; exit 0; fi",
+        "if [ \"$1\" = \"review\" ] && [ \"$2\" = \"--help\" ]; then echo 'read from stdin'; exit 0; fi",
         "exit 1"
       ].join("\n")
     );
@@ -32,6 +35,9 @@ describe("diagnostics", () => {
     assert.equal(diagnostics.auth.status, "authenticated");
     assert.equal(diagnostics.appServer.available, true);
     assert.equal(diagnostics.gates.search.available, true);
+    assert.equal(diagnostics.codex.features.execResume, true);
+    assert.equal(diagnostics.codex.features.execStdinPrompt, true);
+    assert.equal(diagnostics.codex.features.reviewStdinPrompt, true);
   });
 
   it("warns when codex is older than the MVP baseline", () => {

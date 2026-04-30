@@ -31,6 +31,7 @@ export function buildContextPackage(options = {}) {
     packageClass,
     workspaceRoot: cwd,
     userRequest: options.userRequest ?? "",
+    input: options.input ?? null,
     constraints: options.constraints ?? [],
     git,
     files: {
@@ -106,10 +107,14 @@ function collectGit(cwd, env) {
     isRepo: root.status === 0,
     root: root.status === 0 ? root.stdout.trim() : null,
     branch: branch.status === 0 ? branch.stdout.trim() : null,
-    statusShort: status.status === 0 ? status.stdout.trim().split("\n").filter(Boolean) : [],
+    statusShort: status.status === 0 ? statusLines(status.stdout) : [],
     diffShortstat: diff.status === 0 ? diff.stdout.trim() : "",
     stagedShortstat: staged.status === 0 ? staged.stdout.trim() : ""
   };
+}
+
+function statusLines(stdout) {
+  return String(stdout ?? "").trimEnd().split("\n").filter(Boolean);
 }
 
 function collectFiles(cwd, statusShort) {

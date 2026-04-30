@@ -8,6 +8,7 @@ import { runIntent } from "./codex-runs.mjs";
 import { collectDiagnostics, collectSetup } from "./diagnostics.mjs";
 import { cancelJob, createJob, listJobs, readJob } from "./jobs.mjs";
 import { normalizeIntent, intentSummary } from "./intent-router.mjs";
+import { resolveTaskInput, taskInputContext } from "./prompt-input.mjs";
 import { emit } from "./render.mjs";
 
 const COMMANDS = new Set([
@@ -152,14 +153,19 @@ function contextPreviewPayload(options) {
   const intent = options.flags.intent ?? options.positional[0] ?? "review";
   const mode = options.flags.mode;
   const normalized = normalizeIntent(intent, mode);
-  const userRequest = options.positional.slice(options.positional[0] === intent ? 1 : 0).join(" ");
+  const taskInput = resolveTaskInput({
+    cwd: options.cwd,
+    flags: options.flags,
+    positional: options.positional.slice(options.positional[0] === intent ? 1 : 0)
+  });
   return {
     type: "context-preview",
     package: buildContextPackage({
       cwd: options.cwd,
       intent: normalized.intent,
       mode: normalized.mode,
-      userRequest
+      userRequest: taskInput.text,
+      input: taskInputContext(taskInput)
     })
   };
 }

@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "../scripts/lib/args.mjs";
 
 const BIN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scripts", "codexctl.mjs");
 
@@ -30,5 +31,11 @@ describe("codexctl CLI", () => {
     const payload = JSON.parse(result.stdout);
     assert.equal(payload.package.intent, "search");
     assert.equal(payload.package.userRequest, "find sources");
+  });
+
+  it("parses resume-last as a boolean flag", () => {
+    const parsed = parseArgs(["--resume-last", "fix this"]);
+    assert.equal(parsed.flags["resume-last"], true);
+    assert.deepEqual(parsed.positional, ["fix this"]);
   });
 });
